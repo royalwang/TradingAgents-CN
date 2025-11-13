@@ -2,11 +2,32 @@
 
 ## 概述
 
-数据源管理模块提供了统一的数据源注册、管理和查询能力，支持多数据源的优先级管理和自动fallback机制。
+数据源管理模块提供了统一的数据源注册、管理和查询能力，支持多数据源的优先级管理和自动fallback机制。支持通过YAML声明式导入和导出数据源配置。
 
 ## 核心功能
 
-### 1. 数据源注册
+### 1. YAML声明式管理
+
+支持通过YAML文件声明式定义数据源配置：
+
+```yaml
+data_sources:
+  - source_id: tushare
+    name: tushare
+    display_name: Tushare
+    description: Tushare是专业的金融数据平台
+    source_type: stock
+    priority: 3
+    is_active: true
+    supported_markets:
+      - A股
+    supported_features:
+      - stock_list
+      - daily_basic
+      - realtime_quotes
+```
+
+### 2. 数据源注册
 
 数据源通过工厂模式自动注册：
 
@@ -88,7 +109,32 @@ df, source = await manager.get_stock_list(
 - `POST /api/platform/data-sources/kline` - 获取K线数据
 - `POST /api/platform/data-sources/news` - 获取新闻数据
 
+### YAML导入/导出
+
+- `POST /api/platform/data-sources/import/yaml` - 从YAML字符串导入
+- `POST /api/platform/data-sources/import/yaml-file` - 从YAML文件导入
+- `GET /api/platform/data-sources/export/yaml` - 导出为YAML格式
+
 ## 使用示例
+
+### YAML导入示例
+
+```python
+from app.platform.data_sources import get_service
+
+service = get_service()
+
+# 从YAML文件导入
+result = await service.import_from_yaml_file(
+    "data_sources.yaml",
+    update_existing=True
+)
+print(f"注册: {result['registered']}")
+print(f"更新: {result['updated']}")
+
+# 导出为YAML
+await service.export_to_yaml_file("exported_data_sources.yaml")
+```
 
 ### Python代码示例
 
@@ -122,6 +168,14 @@ print(f"从 {source} 获取到 {len(quotes)} 只股票的实时行情")
 # 列出所有数据源
 curl -X GET "http://localhost:8000/api/platform/data-sources"
 
+# 从YAML文件导入
+curl -X POST "http://localhost:8000/api/platform/data-sources/import/yaml-file" \
+  -F "file=@data_sources.yaml" \
+  -F "update_existing=true"
+
+# 导出为YAML
+curl -X GET "http://localhost:8000/api/platform/data-sources/export/yaml?enabled=true"
+
 # 获取股票列表
 curl -X POST "http://localhost:8000/api/platform/data-sources/stock-list" \
   -H "Content-Type: application/json" \
@@ -139,6 +193,33 @@ curl -X POST "http://localhost:8000/api/platform/data-sources/kline" \
 ```
 
 ## 注册自定义数据源
+
+### 方式1：通过YAML文件
+
+创建 `my_data_sources.yaml`:
+
+```yaml
+data_sources:
+  - source_id: my_source
+    name: my_source
+    display_name: 我的数据源
+    description: 自定义数据源
+    source_type: stock
+    priority: 2
+    supported_markets:
+      - A股
+    supported_features:
+      - stock_list
+      - daily_basic
+```
+
+然后通过API导入：
+```bash
+curl -X POST "http://localhost:8000/api/platform/data-sources/import/yaml-file" \
+  -F "file=@my_data_sources.yaml"
+```
+
+### 方式2：通过代码注册
 
 ```python
 from app.platform.data_sources import get_factory

@@ -1,0 +1,88 @@
+# 数据源配置示例
+# 支持通过YAML文件声明式定义数据源配置
+
+data_sources:
+  # Tushare
+  - source_id: tushare
+    name: tushare
+    display_name: Tushare
+    description: Tushare是专业的金融数据平台，提供全面的A股数据
+    source_type: stock
+    version: 1.0.0
+    author: Tushare
+    priority: 3
+    is_active: true
+    supported_markets:
+      - A股
+    supported_features:
+      - stock_list
+      - daily_basic
+      - realtime_quotes
+      - kline
+      - news
+    website: https://tushare.pro
+    documentation_url: https://tushare.pro/document/2
+    tags:
+      - professional
+      - a_shares
+      - premium
+    config:
+      requires_token: true
+      api_doc: https://tushare.pro/document/2
+
+  # AKShare
+  - source_id: akshare
+    name: akshare
+    display_name: AKShare
+    description: AKShare是Python开源金融数据接口库，提供全面的金融数据
+    source_type: stock
+    version: 1.0.0
+    author: AKShare Team
+    priority: 2
+    is_active: true
+    supported_markets:
+      - A股
+      - 港股
+      - 美股
+    supported_features:
+      - stock_list
+      - daily_basic
+      - realtime_quotes
+      - kline
+      - news
+    website: https://akshare.akfamily.xyz
+    documentation_url: https://akshare.readthedocs.io
+    tags:
+      - open_source
+      - free
+      - multi_market
+    config:
+      requires_token: false
+      update_frequency: daily
+
+  # BaoStock
+  - source_id: baostock
+    name: baostock
+    display_name: BaoStock
+    description: BaoStock是证券宝数据接口，提供免费的A股数据
+    source_type: stock
+    version: 1.0.0
+    author: BaoStock
+    priority: 1
+    is_active: true
+    supported_markets:
+      - A股
+    supported_features:
+      - stock_list
+      - daily_basic
+      - kline
+    website: http://baostock.com
+    documentation_url: http://baostock.com/baostock/index.php
+    tags:
+      - free
+      - a_shares
+      - backup
+    config:
+      requires_token: false
+      update_frequency: daily
+

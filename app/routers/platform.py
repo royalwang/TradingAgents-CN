@@ -31,9 +31,9 @@ from app.platform.business import (
 )
 from app.platform.data_sources import (
     DataSourceRegistry, DataSourceMetadata, DataSourceStatus, DataSourceType,
-    DataSourceManager, DataSourceFactory,
+    DataSourceManager, DataSourceFactory, DataSourceService,
     get_registry as get_ds_registry, get_manager as get_ds_manager,
-    get_factory as get_ds_factory,
+    get_factory as get_ds_factory, get_service as get_ds_service,
 )
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
@@ -924,4 +924,60 @@ async def get_news_from_sources(
         "source": source_name,
         "count": len(news),
     }
+
+
+@router.post("/data-sources/import/yaml")
+async def import_data_sources_from_yaml(
+    yaml_content: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入数据源配置"""
+    service = get_ds_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_content, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data-sources/import/yaml-file")
+async def import_data_sources_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入数据源配置"""
+    service = get_ds_service()
+    try:
+        # 读取文件内容
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/data-sources/export/yaml")
+async def export_data_sources_to_yaml(
+    source_type: Optional[str] = None,
+    enabled: Optional[bool] = None,
+):
+    """导出数据源配置为YAML格式"""
+    service = get_ds_service()
+    try:
+        sources = await service.get_all(source_type=source_type, enabled=enabled)
+        
+        from app.platform.data_sources.yaml_loader import DataSourceYAMLLoader
+        import yaml
+        
+        data = {"data_sources": [s.to_dict() for s in sources]}
+        yaml_str = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        
+        return {
+            "yaml": yaml_str,
+            "count": len(sources),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
