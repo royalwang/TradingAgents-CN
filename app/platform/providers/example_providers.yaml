@@ -1,0 +1,154 @@
+# LLM Provider配置示例
+# 支持通过YAML文件声明式定义Provider配置
+
+providers:
+  # OpenAI
+  - name: openai
+    display_name: OpenAI
+    description: OpenAI是人工智能领域的领先公司，提供GPT系列模型
+    website: https://openai.com
+    api_doc_url: https://platform.openai.com/docs
+    default_base_url: https://api.openai.com/v1
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - image
+      - vision
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: gpt
+
+  # Anthropic
+  - name: anthropic
+    display_name: Anthropic
+    description: Anthropic专注于AI安全研究，提供Claude系列模型
+    website: https://anthropic.com
+    api_doc_url: https://docs.anthropic.com
+    default_base_url: https://api.anthropic.com
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: claude
+
+  # Google AI
+  - name: google
+    display_name: Google AI
+    description: Google的人工智能平台，提供Gemini系列模型
+    website: https://ai.google.dev
+    api_doc_url: https://ai.google.dev/docs
+    default_base_url: https://generativelanguage.googleapis.com/v1beta
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - vision
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: gemini
+
+  # 智谱AI
+  - name: zhipu
+    display_name: 智谱AI
+    description: 智谱AI提供GLM系列中文大模型
+    website: https://zhipuai.cn
+    api_doc_url: https://open.bigmodel.cn/doc
+    default_base_url: https://open.bigmodel.cn/api/paas/v4
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: glm
+
+  # DeepSeek
+  - name: deepseek
+    display_name: DeepSeek
+    description: DeepSeek提供高性能的AI推理服务
+    website: https://www.deepseek.com
+    api_doc_url: https://platform.deepseek.com/api-docs
+    default_base_url: https://api.deepseek.com
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: deepseek
+
+  # 阿里云百炼
+  - name: dashscope
+    display_name: 阿里云百炼
+    description: 阿里云百炼大模型服务平台，提供通义千问等模型
+    website: https://bailian.console.aliyun.com
+    api_doc_url: https://help.aliyun.com/zh/dashscope/
+    default_base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      model_family: qwen
+
+  # 硅基流动
+  - name: siliconflow
+    display_name: 硅基流动
+    description: 硅基流动提供高性价比的AI推理服务，支持多种开源模型
+    website: https://siliconflow.cn
+    api_doc_url: https://docs.siliconflow.cn
+    default_base_url: https://api.siliconflow.cn/v1
+    is_active: true
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      is_aggregator: true
+
+  # 302.AI
+  - name: 302ai
+    display_name: 302.AI
+    description: 302.AI是企业级AI聚合平台，提供多种主流大模型的统一接口
+    website: https://302.ai
+    api_doc_url: https://doc.302.ai
+    default_base_url: https://api.302.ai/v1
+    is_active: true
+    is_aggregator: true
+    aggregator_type: openai_compatible
+    model_name_format: "{provider}/{model}"
+    supported_features:
+      - chat
+      - completion
+      - embedding
+      - image
+      - vision
+      - function_calling
+      - streaming
+    extra_config:
+      has_api_key: true
+      is_aggregator: true
+

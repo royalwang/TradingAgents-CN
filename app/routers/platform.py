@@ -19,6 +19,10 @@ from app.platform.data import (
     get_registry, get_validator, get_factory, get_transformer,
     get_serializer, get_relationship_manager,
 )
+from app.platform.providers import (
+    ProviderService, ProviderManager, YAMLProviderLoader,
+    get_provider_service, get_provider_manager,
+)
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -488,4 +492,144 @@ async def resolve_references(
     manager = get_relationship_manager()
     result = manager.resolve_references(data, schema_id, depth)
     return result
+
+
+# ==================== LLM Provider管理API ====================
+
+@router.get("/providers")
+async def list_providers(is_active: Optional[bool] = None):
+    """列出所有LLM Provider"""
+    service = get_provider_service()
+    providers = await service.get_all(is_active=is_active)
+    return {
+        "providers": [provider.model_dump(by_alias=True, exclude={"api_key", "api_secret"}) for provider in providers],
+        "count": len(providers),
+    }
+
+
+@router.get("/providers/{name}")
+async def get_provider(name: str):
+    """获取LLM Provider详情"""
+    service = get_provider_service()
+    provider = await service.get_by_name(name)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return provider.model_dump(by_alias=True, exclude={"api_key", "api_secret"})
+
+
+@router.post("/providers")
+async def create_provider(
+    provider_data: Dict[str, Any],
+    api_key: Optional[str] = None,
+    api_secret: Optional[str] = None,
+):
+    """创建LLM Provider"""
+    service = get_provider_service()
+    try:
+        provider = await service.create_provider(provider_data, api_key, api_secret)
+        return provider.model_dump(by_alias=True, exclude={"api_key", "api_secret"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/providers/{name}")
+async def update_provider(
+    name: str,
+    provider_data: Dict[str, Any],
+    api_key: Optional[str] = None,
+    api_secret: Optional[str] = None,
+):
+    """更新LLM Provider"""
+    service = get_provider_service()
+    try:
+        provider = await service.update_provider(name, provider_data, api_key, api_secret)
+        return provider.model_dump(by_alias=True, exclude={"api_key", "api_secret"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/providers/{name}")
+async def delete_provider(name: str):
+    """删除LLM Provider"""
+    service = get_provider_service()
+    success = await service.delete_provider(name)
+    if not success:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return {"success": True, "message": f"Provider {name} deleted"}
+
+
+@router.post("/providers/import/yaml")
+async def import_providers_from_yaml(
+    yaml_content: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入Provider"""
+    service = get_provider_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_content, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/providers/import/yaml-file")
+async def import_providers_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入Provider"""
+    service = get_provider_service()
+    try:
+        # 读取文件内容
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/providers/export/yaml")
+async def export_providers_to_yaml(
+    is_active: Optional[bool] = None,
+):
+    """导出Provider为YAML格式"""
+    service = get_provider_service()
+    try:
+        providers = await service.get_all(is_active=is_active)
+        
+        # 转换为ProviderMetadata并导出为YAML字符串
+        from app.platform.providers.provider_manager import ProviderMetadata
+        from app.platform.providers.yaml_loader import YAMLProviderLoader
+        
+        metadata_list = []
+        for provider in providers:
+            metadata = ProviderMetadata(
+                name=provider.name,
+                display_name=provider.display_name,
+                description=provider.description,
+                website=provider.website,
+                api_doc_url=provider.api_doc_url,
+                logo_url=provider.logo_url,
+                is_active=provider.is_active,
+                supported_features=provider.supported_features,
+                default_base_url=provider.default_base_url,
+                is_aggregator=provider.is_aggregator,
+                aggregator_type=provider.aggregator_type,
+                model_name_format=provider.model_name_format,
+                extra_config=provider.extra_config or {},
+            )
+            metadata_list.append(metadata)
+        
+        import yaml
+        data = {"providers": [m.to_dict() for m in metadata_list]}
+        yaml_str = yaml.dump(data, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        
+        return {
+            "yaml": yaml_str,
+            "count": len(metadata_list),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
