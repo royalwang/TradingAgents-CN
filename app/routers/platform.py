@@ -55,6 +55,7 @@ from app.platform.tenants import (
     get_service as get_tenant_service,
     get_tenant_id, require_tenant,
 )
+from app.core.config import settings
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -1337,4 +1338,62 @@ async def export_tenants_to_yaml(
         return {"yaml": yaml_str}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== Supabase 平台数据管理API ====================
+
+@router.get("/supabase/health")
+async def check_supabase_health():
+    """检查 Supabase 连接健康状态"""
+    from app.platform.supabase import get_supabase_client
+    
+    try:
+        client = get_supabase_client()
+        is_healthy = client.health_check()
+        return {
+            "healthy": is_healthy,
+            "enabled": settings.USE_SUPABASE_FOR_PLATFORM,
+        }
+    except Exception as e:
+        return {
+            "healthy": False,
+            "enabled": settings.USE_SUPABASE_FOR_PLATFORM,
+            "error": str(e),
+        }
+
+
+@router.post("/supabase/migrate")
+async def migrate_to_supabase(
+    migrate_users: bool = True,
+    migrate_tenants: bool = True,
+    migrate_configs: bool = True,
+):
+    """迁移平台数据到 Supabase"""
+    from app.platform.supabase import get_migration
+    
+    if not settings.USE_SUPABASE_FOR_PLATFORM:
+        raise HTTPException(
+            status_code=400,
+            detail="Supabase is not enabled. Set USE_SUPABASE_FOR_PLATFORM=true"
+        )
+    
+    try:
+        migration = get_migration()
+        results = {}
+        
+        if migrate_users:
+            results["users"] = await migration.migrate_users()
+        
+        if migrate_tenants:
+            results["tenants"] = await migration.migrate_tenants()
+        
+        if migrate_configs:
+            results["configs"] = await migration.migrate_configs()
+        
+        return {
+            "success": True,
+            "results": results,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"迁移失败: {str(e)}")
 

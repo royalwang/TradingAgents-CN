@@ -20,6 +20,7 @@ dependencies = [
     "motor>=3.3.0",
     "pymongo>=4.0.0",
     "redis>=6.2.0",
+    "supabase>=2.0.0",  # Supabase Python SDK（用于平台数据存储）
 
     # 认证和安全
     "PyJWT>=2.0.0",

@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     BUSINESS_MONGO_MAX_CONNECTIONS: int = Field(default=200)  # 业务数据库连接池较大
     BUSINESS_MONGO_MIN_CONNECTIONS: int = Field(default=50)
 
+    # Supabase 配置（用于平台数据存储）
+    SUPABASE_URL: str = Field(default="")
+    SUPABASE_KEY: str = Field(default="")
+    SUPABASE_SERVICE_KEY: str = Field(default="")  # 服务端密钥（用于管理操作）
+    USE_SUPABASE_FOR_PLATFORM: bool = Field(default=False)  # 是否使用 Supabase 存储平台数据
+
     @property
     def MONGO_URI(self) -> str:
         """构建MongoDB URI（兼容旧配置）"""
