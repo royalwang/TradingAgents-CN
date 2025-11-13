@@ -1,0 +1,158 @@
+{
+  "plugin_id": "stock_analysis",
+  "name": "股票分析业务插件",
+  "version": "1.0.0",
+  "description": "提供股票分析业务能力，包括基本面分析、市场分析、新闻分析等",
+  "author": "TradingAgents-CN",
+  "capabilities": ["analysis"],
+  "entry_point": "app.platform.business.plugins.stock_analysis.main",
+  "dependencies": [],
+  "tags": ["stock", "analysis", "finance", "trading"],
+  "icon_url": null,
+  "documentation_url": null,
+  "enabled": true,
+  "config": {
+    "default_analysts": ["market", "fundamentals", "news", "social_media"],
+    "default_research_depth": "标准",
+    "supported_markets": ["A股", "港股", "美股"]
+  },
+  "agents": [
+    {
+      "agent_id": "market_analyst",
+      "agent_type": "analyst",
+      "enabled": true,
+      "config": {
+        "description": "市场分析师，负责技术指标和市场趋势分析"
+      }
+    },
+    {
+      "agent_id": "fundamentals_analyst",
+      "agent_type": "analyst",
+      "enabled": true,
+      "config": {
+        "description": "基本面分析师，负责财务数据和基本面分析"
+      }
+    },
+    {
+      "agent_id": "news_analyst",
+      "agent_type": "analyst",
+      "enabled": true,
+      "config": {
+        "description": "新闻分析师，负责新闻和资讯分析"
+      }
+    },
+    {
+      "agent_id": "social_media_analyst",
+      "agent_type": "analyst",
+      "enabled": true,
+      "config": {
+        "description": "社交媒体分析师，负责社交媒体情绪分析"
+      }
+    }
+  ],
+  "tools": [
+    {
+      "tool_id": "get_stock_fundamentals",
+      "tool_type": "data",
+      "enabled": true,
+      "config": {
+        "description": "获取股票基本面数据"
+      }
+    },
+    {
+      "tool_id": "get_market_data",
+      "tool_type": "data",
+      "enabled": true,
+      "config": {
+        "description": "获取市场数据"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "workflow_id": "stock_analysis_workflow",
+      "name": "股票分析工作流",
+      "description": "完整的股票分析流程",
+      "nodes": [
+        {
+          "node_id": "data_preparation",
+          "name": "数据准备",
+          "type": "data"
+        },
+        {
+          "node_id": "analysis",
+          "name": "分析执行",
+          "type": "analysis"
+        },
+        {
+          "node_id": "report_generation",
+          "name": "报告生成",
+          "type": "report"
+        }
+      ],
+      "edges": [
+        {
+          "from": "data_preparation",
+          "to": "analysis"
+        },
+        {
+          "from": "analysis",
+          "to": "report_generation"
+        }
+      ],
+      "config": {}
+    }
+  ],
+  "data_models": [
+    {
+      "model_id": "analysis_request",
+      "model_type": "request",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "股票代码"
+          },
+          "analysis_date": {
+            "type": "string",
+            "format": "date",
+            "description": "分析日期"
+          },
+          "analysts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "分析师列表"
+          }
+        },
+        "required": ["symbol"]
+      },
+      "validation_rules": {}
+    },
+    {
+      "model_id": "analysis_result",
+      "model_type": "response",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "analysis_date": {
+            "type": "string"
+          },
+          "reports": {
+            "type": "object"
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        }
+      },
+      "validation_rules": {}
+    }
+  ]
+}
+

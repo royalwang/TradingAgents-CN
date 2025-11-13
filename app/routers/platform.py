@@ -23,6 +23,12 @@ from app.platform.providers import (
     ProviderService, ProviderManager, YAMLProviderLoader,
     get_provider_service, get_provider_manager,
 )
+from app.platform.business import (
+    BusinessPlugin, PluginCapability, PluginStatus,
+    BusinessPluginRegistry, BusinessPluginManager, BusinessPluginLoader,
+    get_registry as get_business_registry, get_manager as get_business_manager,
+    get_loader as get_business_loader,
+)
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -630,6 +636,114 @@ async def export_providers_to_yaml(
             "yaml": yaml_str,
             "count": len(metadata_list),
         }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== 业务插件API ====================
+
+@router.get("/business/plugins")
+async def list_business_plugins(
+    capability: Optional[str] = None,
+    status: Optional[str] = None,
+    enabled: Optional[bool] = None,
+    tags: Optional[List[str]] = None,
+):
+    """列出所有业务插件"""
+    manager = get_business_manager()
+    
+    capability_enum = None
+    if capability:
+        capability_enum = PluginCapability(capability)
+    
+    status_enum = None
+    if status:
+        status_enum = PluginStatus(status)
+    
+    plugins = manager.list_plugins(
+        capability=capability_enum,
+        status=status_enum,
+        enabled=enabled,
+    )
+    
+    return {
+        "plugins": [plugin.to_dict() for plugin in plugins],
+        "count": len(plugins),
+    }
+
+
+@router.get("/business/plugins/{plugin_id}")
+async def get_business_plugin(plugin_id: str):
+    """获取业务插件详情"""
+    manager = get_business_manager()
+    plugin = manager.get_plugin(plugin_id)
+    if not plugin:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+    return plugin.to_dict()
+
+
+@router.post("/business/plugins/{plugin_id}/activate")
+async def activate_business_plugin(
+    plugin_id: str,
+    config: Optional[Dict[str, Any]] = None,
+):
+    """激活业务插件"""
+    manager = get_business_manager()
+    success = await manager.activate_plugin(plugin_id, config)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to activate plugin")
+    return {"success": True, "message": f"Plugin {plugin_id} activated"}
+
+
+@router.post("/business/plugins/{plugin_id}/deactivate")
+async def deactivate_business_plugin(plugin_id: str):
+    """停用业务插件"""
+    manager = get_business_manager()
+    success = await manager.deactivate_plugin(plugin_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Failed to deactivate plugin")
+    return {"success": True, "message": f"Plugin {plugin_id} deactivated"}
+
+
+@router.post("/business/plugins/{plugin_id}/execute")
+async def execute_business_plugin_capability(
+    plugin_id: str,
+    capability: str,
+    input_data: Dict[str, Any],
+):
+    """执行业务插件能力"""
+    manager = get_business_manager()
+    try:
+        capability_enum = PluginCapability(capability)
+        result = await manager.execute_capability(
+            capability=capability_enum,
+            input_data=input_data,
+            plugin_id=plugin_id,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/business/plugins/discover")
+async def discover_business_plugins():
+    """发现业务插件"""
+    loader = get_business_loader()
+    plugins = loader.discover_plugins()
+    return {
+        "plugins": [plugin.to_dict() for plugin in plugins],
+        "count": len(plugins),
+    }
+
+
+@router.post("/business/plugins/register")
+async def register_business_plugin(plugin_data: Dict[str, Any]):
+    """注册业务插件"""
+    registry = get_business_registry()
+    try:
+        plugin = BusinessPlugin.from_dict(plugin_data)
+        registry.register(plugin)
+        return plugin.to_dict()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
