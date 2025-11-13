@@ -5,12 +5,22 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
-from app.platform.agents import AgentRegistry, AgentManager, AgentFactory, get_registry, get_manager, get_factory
+from app.platform.agents import (
+    AgentRegistry, AgentManager, AgentFactory, AgentService,
+    get_registry, get_manager, get_factory, get_service as get_agent_service,
+)
 from app.platform.knowledge import KnowledgeBase, create_vector_store, create_embedding_service
 from app.platform.parsers import ParserFactory, get_parser_factory
 from app.platform.mcp import MCPServer, MCPToolRegistry, get_mcp_server
-from app.platform.plugins import PluginRegistry, PluginManager, PluginLoader, get_registry as get_plugin_registry, get_manager as get_plugin_manager
-from app.platform.workflow import WorkflowEngine, WorkflowExecutor, get_engine, get_executor
+from app.platform.plugins import (
+    PluginRegistry, PluginManager, PluginLoader, PluginService,
+    get_registry as get_plugin_registry, get_manager as get_plugin_manager,
+    get_service as get_plugin_service,
+)
+from app.platform.workflow import (
+    WorkflowEngine, WorkflowExecutor, WorkflowService,
+    get_engine, get_executor, get_service as get_workflow_service,
+)
 from app.platform.data import (
     SchemaRegistry, DataSchema, FieldDefinition, SchemaType,
     DataValidator, DataFactory, DataBuilder, DataGenerator,
@@ -108,6 +118,61 @@ async def delete_agent_instance(instance_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Instance not found")
     return {"success": True}
+
+
+# ==================== 智能体YAML声明式管理API ====================
+
+@router.post("/agents/import/yaml")
+async def import_agents_from_yaml_string(
+    yaml_str: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入智能体配置"""
+    service = get_agent_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/agents/import/yaml-file")
+async def import_agents_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入智能体配置"""
+    service = get_agent_service()
+    try:
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/agents/export/yaml")
+async def export_agents_to_yaml(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+):
+    """导出智能体配置为YAML格式"""
+    service = get_agent_service()
+    try:
+        def filter_func(agent):
+            if status and agent.status.value != status:
+                return False
+            if category and agent.category != category:
+                return False
+            return True
+        
+        yaml_str = await service.export_to_yaml_string(filter_func)
+        return {
+            "yaml": yaml_str,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==================== 知识库API ====================
@@ -297,6 +362,61 @@ async def discover_plugins():
     return {"plugins": [plugin.to_dict() for plugin in plugins], "count": len(plugins)}
 
 
+# ==================== 插件YAML声明式管理API ====================
+
+@router.post("/plugins/import/yaml")
+async def import_plugins_from_yaml_string(
+    yaml_str: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入插件配置"""
+    service = get_plugin_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/plugins/import/yaml-file")
+async def import_plugins_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入插件配置"""
+    service = get_plugin_service()
+    try:
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/plugins/export/yaml")
+async def export_plugins_to_yaml(
+    status: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+):
+    """导出插件配置为YAML格式"""
+    service = get_plugin_service()
+    try:
+        def filter_func(plugin):
+            if status and plugin.status.value != status:
+                return False
+            if tags and not any(tag in plugin.tags for tag in tags):
+                return False
+            return True
+        
+        yaml_str = await service.export_to_yaml_string(filter_func)
+        return {
+            "yaml": yaml_str,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ==================== 工作流API ====================
 
 @router.get("/workflows")
@@ -317,6 +437,58 @@ async def execute_workflow(
     executor = get_executor()
     result = await executor.execute(workflow_id, initial_state, config)
     return result
+
+
+# ==================== 工作流YAML声明式管理API ====================
+
+@router.post("/workflows/import/yaml")
+async def import_workflows_from_yaml_string(
+    yaml_str: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入工作流配置"""
+    service = get_workflow_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/workflows/import/yaml-file")
+async def import_workflows_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入工作流配置"""
+    service = get_workflow_service()
+    try:
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/workflows/export/yaml")
+async def export_workflows_to_yaml(
+    status: Optional[str] = None,
+):
+    """导出工作流配置为YAML格式"""
+    service = get_workflow_service()
+    try:
+        def filter_func(workflow):
+            if status and workflow.status != status:
+                return False
+            return True
+        
+        yaml_str = await service.export_to_yaml_string(filter_func)
+        return {
+            "yaml": yaml_str,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==================== 声明式数据API ====================
