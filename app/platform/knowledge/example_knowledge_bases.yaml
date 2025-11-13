@@ -1,0 +1,56 @@
+# 知识库配置示例
+knowledge_bases:
+  - kb_id: stock_research
+    name: 股票研究知识库
+    description: 存储股票研究报告和分析文档
+    vector_store_type: chromadb
+    embedding_model: text-embedding-3-small
+    chunk_size: 1000
+    chunk_overlap: 200
+    collection_name: kb_stock_research
+    persist_directory: data/chromadb
+    status: active
+    tags:
+      - stock
+      - research
+      - analysis
+    metadata:
+      category: research
+      market: A股
+  
+  - kb_id: financial_reports
+    name: 财务报告知识库
+    description: 存储上市公司财务报告
+    vector_store_type: chromadb
+    embedding_model: text-embedding-3-small
+    chunk_size: 1500
+    chunk_overlap: 300
+    collection_name: kb_financial_reports
+    persist_directory: data/chromadb
+    status: active
+    tags:
+      - financial
+      - reports
+      - quarterly
+    metadata:
+      category: financial
+      market: A股
+  
+  - kb_id: market_news
+    name: 市场新闻知识库
+    description: 存储市场新闻和公告
+    vector_store_type: chromadb
+    embedding_model: text-embedding-3-small
+    chunk_size: 800
+    chunk_overlap: 150
+    collection_name: kb_market_news
+    persist_directory: data/chromadb
+    status: active
+    tags:
+      - news
+      - market
+      - announcements
+    metadata:
+      category: news
+      market: A股
+

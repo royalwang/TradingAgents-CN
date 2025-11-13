@@ -27,6 +27,7 @@
 - **Agents (智能体)**: `app/platform/agents/yaml_loader.py`, `agent_service.py`
 - **Workflows (工作流)**: `app/platform/workflow/yaml_loader.py`, `workflow_service.py`
 - **Plugins (插件)**: `app/platform/plugins/yaml_loader.py`, `plugin_service.py`
+- **Knowledge Bases (知识库)**: `app/platform/knowledge/yaml_loader.py`, `knowledge_service.py`
 - **Providers (LLM提供商)**: `app/platform/providers/yaml_loader.py`, `provider_service.py`
 - **Data Sources (数据源)**: `app/platform/data_sources/yaml_loader.py`, `data_source_service.py`
 
@@ -173,11 +174,50 @@ plugins:
     status: registered
 ```
 
-### 4. Providers (LLM提供商)
+### 4. Knowledge Bases (知识库)
+
+#### 导入知识库配置
+
+```bash
+curl -X POST "http://localhost:8000/api/platform/knowledge/import/yaml-file" \
+  -F "file=@knowledge_bases.yaml" \
+  -F "update_existing=true"
+```
+
+#### 导出知识库配置
+
+```bash
+curl -X GET "http://localhost:8000/api/platform/knowledge/export/yaml?status=active&tags=stock"
+```
+
+#### YAML格式示例
+
+```yaml
+knowledge_bases:
+  - kb_id: stock_research
+    name: 股票研究知识库
+    description: 存储股票研究报告和分析文档
+    vector_store_type: chromadb
+    embedding_model: text-embedding-3-small
+    chunk_size: 1000
+    chunk_overlap: 200
+    collection_name: kb_stock_research
+    persist_directory: data/chromadb
+    status: active
+    tags:
+      - stock
+      - research
+      - analysis
+    metadata:
+      category: research
+      market: A股
+```
+
+### 5. Providers (LLM提供商)
 
 参考 [PROVIDER_MANAGEMENT.md](./PROVIDER_MANAGEMENT.md)
 
-### 5. Data Sources (数据源)
+### 6. Data Sources (数据源)
 
 参考 [DATA_SOURCES.md](./DATA_SOURCES.md)
 
@@ -214,6 +254,20 @@ result = await service.import_from_yaml_file("workflows.yaml")
 yaml_str = await service.export_to_yaml_string()
 ```
 
+### Knowledge Bases
+
+```python
+from app.platform.knowledge import get_service
+
+service = get_service()
+
+# 从YAML文件导入
+result = await service.import_from_yaml_file("knowledge_bases.yaml")
+
+# 导出为YAML
+yaml_str = await service.export_to_yaml_string()
+```
+
 ### Plugins
 
 ```python
@@ -244,6 +298,11 @@ yaml_str = await service.export_to_yaml_string()
 - `POST /api/platform/plugins/import/yaml` - 从YAML字符串导入
 - `POST /api/platform/plugins/import/yaml-file` - 从YAML文件导入
 - `GET /api/platform/plugins/export/yaml` - 导出为YAML
+
+### Knowledge Bases
+- `POST /api/platform/knowledge/import/yaml` - 从YAML字符串导入
+- `POST /api/platform/knowledge/import/yaml-file` - 从YAML文件导入
+- `GET /api/platform/knowledge/export/yaml` - 导出为YAML
 
 ### Providers
 - `POST /api/platform/providers/import/yaml` - 从YAML字符串导入

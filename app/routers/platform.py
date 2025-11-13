@@ -9,7 +9,10 @@ from app.platform.agents import (
     AgentRegistry, AgentManager, AgentFactory, AgentService,
     get_registry, get_manager, get_factory, get_service as get_agent_service,
 )
-from app.platform.knowledge import KnowledgeBase, create_vector_store, create_embedding_service
+from app.platform.knowledge import (
+    KnowledgeBase, create_vector_store, create_embedding_service,
+    KnowledgeBaseService, get_service as get_kb_service,
+)
 from app.platform.parsers import ParserFactory, get_parser_factory
 from app.platform.mcp import MCPServer, MCPToolRegistry, get_mcp_server
 from app.platform.plugins import (
@@ -303,6 +306,61 @@ async def search_knowledge(
     
     results = await kb.search(query=query, top_k=top_k)
     return {"results": results}
+
+
+# ==================== 知识库YAML声明式管理API ====================
+
+@router.post("/knowledge/import/yaml")
+async def import_knowledge_bases_from_yaml_string(
+    yaml_str: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入知识库配置"""
+    service = get_kb_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/knowledge/import/yaml-file")
+async def import_knowledge_bases_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入知识库配置"""
+    service = get_kb_service()
+    try:
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/knowledge/export/yaml")
+async def export_knowledge_bases_to_yaml(
+    status: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+):
+    """导出知识库配置为YAML格式"""
+    service = get_kb_service()
+    try:
+        def filter_func(kb):
+            if status and kb.status.value != status:
+                return False
+            if tags and not any(tag in kb.tags for tag in tags):
+                return False
+            return True
+        
+        yaml_str = await service.export_to_yaml_string(filter_func)
+        return {
+            "yaml": yaml_str,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==================== MCP工具API ====================
