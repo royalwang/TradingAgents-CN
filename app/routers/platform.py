@@ -11,6 +11,14 @@ from app.platform.parsers import ParserFactory, get_parser_factory
 from app.platform.mcp import MCPServer, MCPToolRegistry, get_mcp_server
 from app.platform.plugins import PluginRegistry, PluginManager, PluginLoader, get_registry as get_plugin_registry, get_manager as get_plugin_manager
 from app.platform.workflow import WorkflowEngine, WorkflowExecutor, get_engine, get_executor
+from app.platform.data import (
+    SchemaRegistry, DataSchema, FieldDefinition, SchemaType,
+    DataValidator, DataFactory, DataBuilder, DataGenerator,
+    DataTransformer, DataSerializer, SerializationFormat,
+    RelationshipManager, DataRelationship, RelationshipType,
+    get_registry, get_validator, get_factory, get_transformer,
+    get_serializer, get_relationship_manager,
+)
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -292,5 +300,192 @@ async def execute_workflow(
     """执行工作流"""
     executor = get_executor()
     result = await executor.execute(workflow_id, initial_state, config)
+    return result
+
+
+# ==================== 声明式数据API ====================
+
+@router.post("/data/schemas")
+async def create_schema(schema_data: Dict[str, Any]):
+    """创建数据模式"""
+    registry = get_registry()
+    schema = DataSchema.from_dict(schema_data)
+    registry.register(schema)
+    return schema.to_dict()
+
+
+@router.get("/data/schemas")
+async def list_schemas():
+    """列出所有数据模式"""
+    registry = get_registry()
+    schemas = registry.list()
+    return {"schemas": [schema.to_dict() for schema in schemas]}
+
+
+@router.get("/data/schemas/{schema_id}")
+async def get_schema(schema_id: str):
+    """获取数据模式"""
+    registry = get_registry()
+    schema = registry.get(schema_id)
+    if not schema:
+        raise HTTPException(status_code=404, detail="Schema not found")
+    return schema.to_dict()
+
+
+@router.get("/data/schemas/{schema_id}/json-schema")
+async def get_json_schema(schema_id: str):
+    """获取JSON Schema格式"""
+    registry = get_registry()
+    schema = registry.get(schema_id)
+    if not schema:
+        raise HTTPException(status_code=404, detail="Schema not found")
+    return schema.to_json_schema()
+
+
+@router.post("/data/schemas/{schema_id}/validate")
+async def validate_data(
+    schema_id: str,
+    data: Dict[str, Any],
+):
+    """验证数据"""
+    registry = get_registry()
+    validator = get_validator()
+    
+    schema = registry.get(schema_id)
+    if not schema:
+        raise HTTPException(status_code=404, detail="Schema not found")
+    
+    result = validator.validate(data, schema)
+    return result.to_dict()
+
+
+@router.post("/data/schemas/{schema_id}/create")
+async def create_data_instance(
+    schema_id: str,
+    data: Optional[Dict[str, Any]] = None,
+    validate: bool = True,
+    fill_defaults: bool = True,
+):
+    """从模式创建数据实例"""
+    factory = get_factory()
+    try:
+        instance = factory.create(
+            schema_id=schema_id,
+            data=data,
+            validate=validate,
+            fill_defaults=fill_defaults,
+        )
+        return instance
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data/schemas/{schema_id}/generate")
+async def generate_data(
+    schema_id: str,
+    count: int = 1,
+    overrides: Optional[Dict[str, Any]] = None,
+):
+    """生成示例数据"""
+    generator = DataGenerator()
+    try:
+        instances = generator.generate(
+            schema_id=schema_id,
+            count=count,
+            **(overrides or {}),
+        )
+        return {"instances": instances, "count": len(instances)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data/transform")
+async def transform_data(
+    data: Dict[str, Any],
+    transformation_name: str,
+    direction: str = "forward",
+):
+    """转换数据"""
+    transformer = get_transformer()
+    try:
+        from app.platform.data.transformer import TransformDirection
+        direction_enum = TransformDirection(direction)
+        result = transformer.transform(data, transformation_name, direction_enum)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data/serialize")
+async def serialize_data(
+    data: Dict[str, Any],
+    format: str = "json",
+    schema_id: Optional[str] = None,
+):
+    """序列化数据"""
+    serializer = get_serializer()
+    try:
+        format_enum = SerializationFormat(format)
+        result = serializer.serialize(data, format_enum, schema_id)
+        return {"format": format, "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data/deserialize")
+async def deserialize_data(
+    data_str: str,
+    format: str = "json",
+    schema_id: Optional[str] = None,
+):
+    """反序列化数据"""
+    serializer = get_serializer()
+    try:
+        format_enum = SerializationFormat(format)
+        result = serializer.deserialize(data_str, format_enum, schema_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/data/relationships")
+async def create_relationship(relationship_data: Dict[str, Any]):
+    """创建数据关系"""
+    manager = get_relationship_manager()
+    try:
+        relationship = manager.register(
+            relationship_id=relationship_data["relationship_id"],
+            name=relationship_data["name"],
+            source_schema_id=relationship_data["source_schema_id"],
+            target_schema_id=relationship_data["target_schema_id"],
+            relationship_type=RelationshipType(relationship_data["relationship_type"]),
+            source_field=relationship_data["source_field"],
+            target_field=relationship_data["target_field"],
+            cascade_delete=relationship_data.get("cascade_delete", False),
+            cascade_update=relationship_data.get("cascade_update", False),
+            metadata=relationship_data.get("metadata"),
+        )
+        return relationship.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/data/relationships")
+async def list_relationships():
+    """列出所有数据关系"""
+    manager = get_relationship_manager()
+    relationships = manager.list()
+    return {"relationships": [rel.to_dict() for rel in relationships]}
+
+
+@router.post("/data/schemas/{schema_id}/resolve")
+async def resolve_references(
+    schema_id: str,
+    data: Dict[str, Any],
+    depth: int = 1,
+):
+    """解析数据引用关系"""
+    manager = get_relationship_manager()
+    result = manager.resolve_references(data, schema_id, depth)
     return result
 
