@@ -16,11 +16,19 @@ from .config import settings
 
 logger = logging.getLogger(__name__)
 
-# 全局连接实例
+# 全局连接实例（兼容旧配置）
 mongo_client: Optional[AsyncIOMotorClient] = None
 mongo_db: Optional[AsyncIOMotorDatabase] = None
 redis_client: Optional[Redis] = None
 redis_pool: Optional[ConnectionPool] = None
+
+# 平台数据库连接实例
+platform_mongo_client: Optional[AsyncIOMotorClient] = None
+platform_mongo_db: Optional[AsyncIOMotorDatabase] = None
+
+# 业务数据库连接实例
+business_mongo_client: Optional[AsyncIOMotorClient] = None
+business_mongo_db: Optional[AsyncIOMotorDatabase] = None
 
 # 同步 MongoDB 连接（用于非异步上下文）
 _sync_mongo_client: Optional[MongoClient] = None
@@ -257,6 +265,50 @@ def get_mongo_db_sync() -> Database:
 
     _sync_mongo_db = _sync_mongo_client[settings.MONGO_DB]
     return _sync_mongo_db
+
+
+def get_platform_db() -> AsyncIOMotorDatabase:
+    """获取平台数据库实例"""
+    global platform_mongo_db, platform_mongo_client
+    
+    if platform_mongo_db is not None:
+        return platform_mongo_db
+    
+    if platform_mongo_client is None:
+        platform_mongo_client = AsyncIOMotorClient(
+            settings.PLATFORM_MONGO_URI,
+            maxPoolSize=settings.PLATFORM_MONGO_MAX_CONNECTIONS,
+            minPoolSize=settings.PLATFORM_MONGO_MIN_CONNECTIONS,
+            maxIdleTimeMS=30000,
+            serverSelectionTimeoutMS=settings.MONGO_SERVER_SELECTION_TIMEOUT_MS,
+            connectTimeoutMS=settings.MONGO_CONNECT_TIMEOUT_MS,
+            socketTimeoutMS=settings.MONGO_SOCKET_TIMEOUT_MS,
+        )
+    
+    platform_mongo_db = platform_mongo_client[settings.PLATFORM_MONGODB_DATABASE]
+    return platform_mongo_db
+
+
+def get_business_db() -> AsyncIOMotorDatabase:
+    """获取业务数据库实例"""
+    global business_mongo_db, business_mongo_client
+    
+    if business_mongo_db is not None:
+        return business_mongo_db
+    
+    if business_mongo_client is None:
+        business_mongo_client = AsyncIOMotorClient(
+            settings.BUSINESS_MONGO_URI,
+            maxPoolSize=settings.BUSINESS_MONGO_MAX_CONNECTIONS,
+            minPoolSize=settings.BUSINESS_MONGO_MIN_CONNECTIONS,
+            maxIdleTimeMS=30000,
+            serverSelectionTimeoutMS=settings.MONGO_SERVER_SELECTION_TIMEOUT_MS,
+            connectTimeoutMS=settings.MONGO_CONNECT_TIMEOUT_MS,
+            socketTimeoutMS=settings.MONGO_SOCKET_TIMEOUT_MS,
+        )
+    
+    business_mongo_db = business_mongo_client[settings.BUSINESS_MONGODB_DATABASE]
+    return business_mongo_db
 
 
 def get_redis_client() -> Redis:

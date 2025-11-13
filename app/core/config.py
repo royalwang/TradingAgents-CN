@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     ALLOWED_HOSTS: List[str] = Field(default_factory=lambda: ["*"])
 
-    # MongoDB配置
+    # MongoDB配置（兼容旧配置）
     MONGODB_HOST: str = Field(default="localhost")
     MONGODB_PORT: int = Field(default=27017)
     MONGODB_USERNAME: str = Field(default="")
@@ -41,9 +41,29 @@ class Settings(BaseSettings):
     MONGO_SOCKET_TIMEOUT_MS: int = Field(default=60000)   # 套接字超时：60秒（原为20秒）
     MONGO_SERVER_SELECTION_TIMEOUT_MS: int = Field(default=5000)  # 服务器选择超时：5秒
 
+    # 平台数据库配置（Platform Database）
+    PLATFORM_MONGODB_HOST: str = Field(default="")  # 为空时使用MONGODB_HOST
+    PLATFORM_MONGODB_PORT: int = Field(default=0)  # 为0时使用MONGODB_PORT
+    PLATFORM_MONGODB_USERNAME: str = Field(default="")  # 为空时使用MONGODB_USERNAME
+    PLATFORM_MONGODB_PASSWORD: str = Field(default="")  # 为空时使用MONGODB_PASSWORD
+    PLATFORM_MONGODB_DATABASE: str = Field(default="tradingagents_platform")
+    PLATFORM_MONGODB_AUTH_SOURCE: str = Field(default="admin")
+    PLATFORM_MONGO_MAX_CONNECTIONS: int = Field(default=50)  # 平台数据库连接池较小
+    PLATFORM_MONGO_MIN_CONNECTIONS: int = Field(default=10)
+
+    # 业务数据库配置（Business Database）
+    BUSINESS_MONGODB_HOST: str = Field(default="")  # 为空时使用MONGODB_HOST
+    BUSINESS_MONGODB_PORT: int = Field(default=0)  # 为0时使用MONGODB_PORT
+    BUSINESS_MONGODB_USERNAME: str = Field(default="")  # 为空时使用MONGODB_USERNAME
+    BUSINESS_MONGODB_PASSWORD: str = Field(default="")  # 为空时使用MONGODB_PASSWORD
+    BUSINESS_MONGODB_DATABASE: str = Field(default="tradingagents_business")
+    BUSINESS_MONGODB_AUTH_SOURCE: str = Field(default="admin")
+    BUSINESS_MONGO_MAX_CONNECTIONS: int = Field(default=200)  # 业务数据库连接池较大
+    BUSINESS_MONGO_MIN_CONNECTIONS: int = Field(default=50)
+
     @property
     def MONGO_URI(self) -> str:
-        """构建MongoDB URI"""
+        """构建MongoDB URI（兼容旧配置）"""
         if self.MONGODB_USERNAME and self.MONGODB_PASSWORD:
             return f"mongodb://{self.MONGODB_USERNAME}:{self.MONGODB_PASSWORD}@{self.MONGODB_HOST}:{self.MONGODB_PORT}/{self.MONGODB_DATABASE}?authSource={self.MONGODB_AUTH_SOURCE}"
         else:
@@ -51,8 +71,36 @@ class Settings(BaseSettings):
 
     @property
     def MONGO_DB(self) -> str:
-        """获取数据库名称"""
+        """获取数据库名称（兼容旧配置）"""
         return self.MONGODB_DATABASE
+
+    @property
+    def PLATFORM_MONGO_URI(self) -> str:
+        """构建平台数据库URI"""
+        host = self.PLATFORM_MONGODB_HOST or self.MONGODB_HOST
+        port = self.PLATFORM_MONGODB_PORT or self.MONGODB_PORT
+        username = self.PLATFORM_MONGODB_USERNAME or self.MONGODB_USERNAME
+        password = self.PLATFORM_MONGODB_PASSWORD or self.MONGODB_PASSWORD
+        auth_source = self.PLATFORM_MONGODB_AUTH_SOURCE
+        
+        if username and password:
+            return f"mongodb://{username}:{password}@{host}:{port}/{self.PLATFORM_MONGODB_DATABASE}?authSource={auth_source}"
+        else:
+            return f"mongodb://{host}:{port}/{self.PLATFORM_MONGODB_DATABASE}"
+
+    @property
+    def BUSINESS_MONGO_URI(self) -> str:
+        """构建业务数据库URI"""
+        host = self.BUSINESS_MONGODB_HOST or self.MONGODB_HOST
+        port = self.BUSINESS_MONGODB_PORT or self.MONGODB_PORT
+        username = self.BUSINESS_MONGODB_USERNAME or self.MONGODB_USERNAME
+        password = self.BUSINESS_MONGODB_PASSWORD or self.MONGODB_PASSWORD
+        auth_source = self.BUSINESS_MONGODB_AUTH_SOURCE
+        
+        if username and password:
+            return f"mongodb://{username}:{password}@{host}:{port}/{self.BUSINESS_MONGODB_DATABASE}?authSource={auth_source}"
+        else:
+            return f"mongodb://{host}:{port}/{self.BUSINESS_MONGODB_DATABASE}"
 
     # Redis配置
     REDIS_HOST: str = Field(default="localhost")
