@@ -4,7 +4,7 @@
 所有模块都支持YAML声明式管理
 """
 
-from . import data, providers, business, data_sources, agents, workflow, plugins
+from . import data, providers, business, data_sources, agents, workflow, plugins, tenants
 
 __version__ = "2.0.0"
 __all__ = [
@@ -15,5 +15,6 @@ __all__ = [
     "agents",
     "workflow",
     "plugins",
+    "tenants",
 ]
 

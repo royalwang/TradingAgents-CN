@@ -14,6 +14,7 @@ from app.services.user_service import user_service
 from app.models.user import UserCreate, UserUpdate
 from app.services.operation_log_service import log_operation
 from app.models.operation_log import ActionType
+from app.platform.tenants import get_manager as get_tenant_manager, get_tenant_id
 
 # 尝试导入日志管理器
 try:
@@ -37,6 +38,7 @@ router = APIRouter()
 class LoginRequest(BaseModel):
     username: str
     password: str
+    tenant_id: Optional[str] = None  # 租户ID（可选，可通过域名或请求头识别）
 
 class LoginResponse(BaseModel):
     access_token: str
@@ -66,7 +68,7 @@ class CreateUserRequest(BaseModel):
     password: str
     is_admin: bool = False
 
-async def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
+async def get_current_user(authorization: Optional[str] = Header(default=None), request: Request = None) -> dict:
     """获取当前用户信息"""
     logger.debug(f"🔐 认证检查开始")
     logger.debug(f"📋 Authorization header: {authorization[:50] if authorization else 'None'}...")
@@ -90,8 +92,14 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
         logger.warning("❌ Token验证失败")
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # 从token中提取用户名
+    username = token_data.get("sub")
+    if not username:
+        logger.warning("❌ Token中缺少用户名")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     # 从数据库获取用户信息
-    user = await user_service.get_user_by_username(token_data.sub)
+    user = await user_service.get_user_by_username(username)
     if not user:
         logger.warning(f"❌ 用户不存在: {token_data.sub}")
         raise HTTPException(status_code=401, detail="User not found")
@@ -144,6 +152,30 @@ async def login(payload: LoginRequest, request: Request):
 
         logger.info(f"🔍 开始认证用户: {payload.username}")
 
+        # 识别租户（优先级：请求参数 > 请求头 > 域名）
+        tenant_id = payload.tenant_id
+        if not tenant_id:
+            tenant_id = request.headers.get("X-Tenant-ID")
+        if not tenant_id:
+            # 从域名提取租户（通过中间件处理）
+            tenant_id = get_tenant_id(request)
+        
+        # 如果指定了租户，验证租户访问权限
+        tenant_manager = get_tenant_manager()
+        if tenant_id:
+            logger.info(f"🔍 检测到租户ID: {tenant_id}")
+            has_access = await tenant_manager.check_tenant_access(tenant_id)
+            if not has_access:
+                logger.warning(f"❌ 租户访问被拒绝: {tenant_id}")
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"租户 {tenant_id} 不可用或已过期"
+                )
+            
+            # 验证用户是否属于该租户
+            # 注意：如果用户没有tenant_id，可能是系统管理员，允许访问
+            # 如果用户有tenant_id，必须匹配
+
         # 使用数据库认证
         user = await user_service.authenticate_user(payload.username, payload.password)
 
@@ -165,9 +197,43 @@ async def login(payload: LoginRequest, request: Request):
             )
             raise HTTPException(status_code=401, detail="用户名或密码错误")
 
-        # 生成 token
-        token = AuthService.create_access_token(sub=user.username)
-        refresh_token = AuthService.create_access_token(sub=user.username, expires_delta=60*60*24*7)  # 7天有效期
+        # 验证租户匹配（如果指定了租户且用户有租户ID）
+        if tenant_id and user.tenant_id:
+            if user.tenant_id != tenant_id:
+                logger.warning(f"❌ 用户租户不匹配: 用户租户={user.tenant_id}, 请求租户={tenant_id}")
+                raise HTTPException(
+                    status_code=403,
+                    detail="用户不属于指定的租户"
+                )
+        elif tenant_id and not user.tenant_id:
+            # 如果请求指定了租户，但用户没有租户ID，可能是系统管理员，允许访问
+            logger.info(f"ℹ️ 用户 {user.username} 没有租户ID，但请求指定了租户 {tenant_id}，允许系统管理员访问")
+        elif not tenant_id and user.tenant_id:
+            # 如果用户有租户ID但请求没有指定，使用用户的租户ID
+            tenant_id = user.tenant_id
+            logger.info(f"ℹ️ 使用用户的默认租户: {tenant_id}")
+
+        # 生成 token（包含租户信息）
+        token_payload = {
+            "sub": user.username,
+            "tenant_id": tenant_id,  # 在token中包含租户ID
+        }
+        token = AuthService.create_access_token_with_payload(token_payload)
+        refresh_token = AuthService.create_access_token_with_payload(token_payload, expires_delta=60*60*24*7)  # 7天有效期
+
+        # 获取租户信息
+        tenant_info = None
+        if tenant_id or user.tenant_id:
+            final_tenant_id = tenant_id or user.tenant_id
+            tenant = tenant_manager.get_tenant(final_tenant_id)
+            if tenant:
+                tenant_info = {
+                    "id": tenant.tenant_id,
+                    "name": tenant.name,
+                    "display_name": tenant.display_name,
+                    "tier": tenant.tier.value,
+                    "status": tenant.status.value,
+                }
 
         # 记录登录成功日志
         await log_operation(
@@ -193,8 +259,11 @@ async def login(payload: LoginRequest, request: Request):
                     "username": user.username,
                     "email": user.email,
                     "name": user.username,
-                    "is_admin": user.is_admin
-                }
+                    "is_admin": user.is_admin,
+                    "is_tenant_admin": user.is_tenant_admin,
+                    "tenant_id": tenant_id or user.tenant_id,
+                },
+                "tenant": tenant_info if (tenant_id or user.tenant_id) else None
             },
             "message": "登录成功"
         }

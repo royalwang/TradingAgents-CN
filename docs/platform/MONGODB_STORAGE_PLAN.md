@@ -83,6 +83,79 @@
 
 ---
 
+### 1.5. 多租户管理
+
+#### `tenants`
+**用途**: 存储租户元数据和配置
+
+**数据结构**:
+```json
+{
+  "_id": ObjectId,
+  "tenant_id": "string (unique)",
+  "name": "string",
+  "display_name": "string",
+  "description": "string",
+  "domain": "string (unique, optional)",
+  "tier": "free|basic|professional|enterprise",
+  "status": "active|inactive|suspended|trial|expired",
+  "max_users": 10,
+  "max_storage_gb": 1,
+  "max_api_calls_per_day": 1000,
+  "features": ["trading", "rental_management"],
+  "config": {
+    "theme": "dark|light",
+    "language": "zh-CN|en-US"
+  },
+  "metadata": {},
+  "owner_id": "string",
+  "created_at": ISODate,
+  "updated_at": ISODate,
+  "expires_at": ISODate
+}
+```
+
+**索引**:
+- `tenant_id`: 唯一索引
+- `domain`: 唯一索引（稀疏索引）
+- `status`: 普通索引
+- `tier`: 普通索引
+- `owner_id`: 普通索引
+
+#### 租户数据集合（动态命名）
+
+**命名规则**: `tenant_{tenant_id}_{collection_name}`
+
+**示例集合**:
+- `tenant_company_a_users`: 租户用户数据
+- `tenant_company_a_agents`: 租户智能体
+- `tenant_company_a_workflows`: 租户工作流
+- `tenant_company_a_knowledge_bases`: 租户知识库
+- `tenant_company_a_plugins`: 租户插件
+- `tenant_company_a_data_sources`: 租户数据源
+- `tenant_company_a_rental_properties`: 租户房产（租房管理）
+- `tenant_company_a_rental_contracts`: 租户合同（租房管理）
+- `tenant_company_a_rental_payments`: 租户支付（租房管理）
+
+**通用数据结构**:
+所有租户数据集合都包含以下字段：
+```json
+{
+  "_id": ObjectId,
+  "tenant_id": "string",
+  "created_at": ISODate,
+  "updated_at": ISODate,
+  // ... 其他业务字段
+}
+```
+
+**通用索引**:
+- `tenant_id`: 普通索引（所有租户集合）
+- `created_at`: 普通索引（降序）
+- `updated_at`: 普通索引（降序）
+
+---
+
 ### 2. 股票数据
 
 #### `stock_basic_info`
@@ -760,6 +833,7 @@
 
 MongoDB存储规划涵盖了平台的所有数据需求，包括：
 - ✅ 用户与权限管理
+- ✅ 多租户管理（租户元数据、租户数据隔离）
 - ✅ 股票数据（基础信息、行情、财务）
 - ✅ 分析任务与报告
 - ✅ 平台配置
@@ -770,4 +844,35 @@ MongoDB存储规划涵盖了平台的所有数据需求，包括：
 - ✅ 操作日志
 
 通过合理的索引设计和数据分片策略，可以确保系统的高性能和高可用性。
+
+## 多租户数据隔离说明
+
+### 数据隔离策略
+
+平台采用**集合前缀**方式实现多租户数据隔离：
+
+1. **租户元数据**: 存储在全局 `tenants` 集合中
+2. **租户业务数据**: 存储在 `tenant_{tenant_id}_{collection_name}` 格式的集合中
+3. **数据访问**: 所有数据操作自动添加 `tenant_id` 过滤条件
+
+### 租户数据集合命名规范
+
+- **格式**: `tenant_{tenant_id}_{base_collection}`
+- **示例**: 
+  - `tenant_company_a_users`
+  - `tenant_company_b_agents`
+  - `tenant_rental_c_properties`
+
+### 索引策略
+
+所有租户数据集合都包含：
+- `tenant_id` 索引（确保数据隔离）
+- `created_at` 和 `updated_at` 索引（支持时间范围查询）
+
+### 数据迁移
+
+租户数据可以独立备份和迁移：
+- 备份：导出 `tenant_{tenant_id}_*` 所有集合
+- 迁移：将租户数据迁移到新环境
+- 删除：删除租户时，清理所有 `tenant_{tenant_id}_*` 集合
 

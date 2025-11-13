@@ -1,0 +1,83 @@
+# 租户配置示例
+tenants:
+  - tenant_id: company_a
+    name: company_a
+    display_name: 公司A
+    description: 公司A的租户实例，提供交易和租房管理功能
+    domain: company-a.tradingagents.cn
+    tier: professional
+    status: active
+    max_users: 50
+    max_storage_gb: 100
+    max_api_calls_per_day: 10000
+    features:
+      - trading
+      - rental_management
+      - analytics
+      - reporting
+    config:
+      theme: "dark"
+      language: "zh-CN"
+      timezone: "Asia/Shanghai"
+    metadata:
+      industry: "金融"
+      region: "中国"
+      contact_email: "admin@company-a.com"
+    owner_id: "user_001"
+    expires_at: "2026-12-31T23:59:59Z"
+  
+  - tenant_id: company_b
+    name: company_b
+    display_name: 公司B
+    description: 公司B的租户实例，仅提供交易功能
+    domain: company-b.tradingagents.cn
+    tier: basic
+    status: active
+    max_users: 20
+    max_storage_gb: 10
+    max_api_calls_per_day: 5000
+    features:
+      - trading
+    config:
+      theme: "light"
+      language: "zh-CN"
+    owner_id: "user_002"
+  
+  - tenant_id: rental_company_c
+    name: rental_company_c
+    display_name: 租房管理公司C
+    description: 专注于租房管理的租户实例
+    domain: rental-c.tradingagents.cn
+    tier: professional
+    status: active
+    max_users: 100
+    max_storage_gb: 200
+    max_api_calls_per_day: 20000
+    features:
+      - rental_management
+      - analytics
+      - reporting
+      - payment
+    config:
+      theme: "light"
+      language: "zh-CN"
+      currency: "CNY"
+    metadata:
+      industry: "房地产"
+      region: "中国"
+      property_count: 500
+    owner_id: "user_003"
+  
+  - tenant_id: trial_user
+    name: trial_user
+    display_name: 试用用户
+    description: 免费试用租户
+    tier: free
+    status: trial
+    max_users: 3
+    max_storage_gb: 1
+    max_api_calls_per_day: 100
+    features:
+      - trading
+    expires_at: "2025-12-31T23:59:59Z"
+

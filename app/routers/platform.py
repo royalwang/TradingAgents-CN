@@ -48,6 +48,13 @@ from app.platform.data_sources import (
     get_registry as get_ds_registry, get_manager as get_ds_manager,
     get_factory as get_ds_factory, get_service as get_ds_service,
 )
+from app.platform.tenants import (
+    TenantRegistry, TenantMetadata, TenantStatus, TenantTier,
+    TenantManager, TenantService,
+    get_registry as get_tenant_registry, get_manager as get_tenant_manager,
+    get_service as get_tenant_service,
+    get_tenant_id, require_tenant,
+)
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -1208,6 +1215,126 @@ async def export_data_sources_to_yaml(
             "yaml": yaml_str,
             "count": len(sources),
         }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== 租户管理API ====================
+
+@router.get("/tenants")
+async def list_tenants(
+    status: Optional[str] = None,
+    tier: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    """列出租户"""
+    registry = get_tenant_registry()
+    
+    # 转换状态和等级
+    tenant_status = TenantStatus(status) if status else None
+    tenant_tier = TenantTier(tier) if tier else None
+    
+    if search:
+        tenants = registry.search(search)
+    else:
+        tenants = registry.list(status=tenant_status, tier=tenant_tier)
+    
+    return {
+        "tenants": [tenant.to_dict() for tenant in tenants],
+        "count": len(tenants),
+    }
+
+
+@router.get("/tenants/{tenant_id}")
+async def get_tenant(tenant_id: str):
+    """获取租户详情"""
+    registry = get_tenant_registry()
+    tenant = registry.get(tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return tenant.to_dict()
+
+
+@router.get("/tenants/{tenant_id}/statistics")
+async def get_tenant_statistics(tenant_id: str):
+    """获取租户统计信息"""
+    manager = get_tenant_manager()
+    stats = await manager.get_tenant_statistics(tenant_id)
+    if not stats:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return stats
+
+
+@router.post("/tenants/{tenant_id}/status")
+async def update_tenant_status(
+    tenant_id: str,
+    status: str,
+):
+    """更新租户状态"""
+    registry = get_tenant_registry()
+    try:
+        tenant_status = TenantStatus(status)
+        success = registry.update_status(tenant_id, tenant_status)
+        if not success:
+            raise HTTPException(status_code=404, detail="Tenant not found")
+        return {"success": True, "status": status}
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+
+# ==================== 租户YAML声明式管理API ====================
+
+@router.post("/tenants/import/yaml")
+async def import_tenants_from_yaml_string(
+    yaml_str: str,
+    update_existing: bool = False,
+):
+    """从YAML字符串导入租户配置"""
+    service = get_tenant_service()
+    try:
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/tenants/import/yaml-file")
+async def import_tenants_from_yaml_file(
+    file: UploadFile = File(...),
+    update_existing: bool = False,
+):
+    """从YAML文件导入租户配置"""
+    service = get_tenant_service()
+    try:
+        content = await file.read()
+        yaml_str = content.decode('utf-8')
+        result = await service.import_from_yaml_string(yaml_str, update_existing)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/tenants/export/yaml")
+async def export_tenants_to_yaml(
+    status: Optional[str] = None,
+    tier: Optional[str] = None,
+):
+    """导出租户配置为YAML格式"""
+    service = get_tenant_service()
+    try:
+        # 构建过滤函数
+        filter_func = None
+        if status or tier:
+            def filter_tenant(tenant):
+                if status and tenant.status.value != status:
+                    return False
+                if tier and tenant.tier.value != tier:
+                    return False
+                return True
+            filter_func = filter_tenant
+        
+        yaml_str = await service.export_to_yaml_string(filter_func)
+        return {"yaml": yaml_str}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

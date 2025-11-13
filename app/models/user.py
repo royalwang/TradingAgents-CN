@@ -76,9 +76,11 @@ class User(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
     hashed_password: str
+    tenant_id: Optional[str] = None  # 所属租户ID（多租户支持）
     is_active: bool = True
     is_verified: bool = False
     is_admin: bool = False
+    is_tenant_admin: bool = False  # 租户管理员
     created_at: datetime = Field(default_factory=now_tz)
     updated_at: datetime = Field(default_factory=now_tz)
     last_login: Optional[datetime] = None
