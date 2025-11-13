@@ -29,6 +29,12 @@ from app.platform.business import (
     get_registry as get_business_registry, get_manager as get_business_manager,
     get_loader as get_business_loader,
 )
+from app.platform.data_sources import (
+    DataSourceRegistry, DataSourceMetadata, DataSourceStatus, DataSourceType,
+    DataSourceManager, DataSourceFactory,
+    get_registry as get_ds_registry, get_manager as get_ds_manager,
+    get_factory as get_ds_factory,
+)
 
 router = APIRouter(prefix="/api/platform", tags=["platform"])
 
@@ -746,4 +752,176 @@ async def register_business_plugin(plugin_data: Dict[str, Any]):
         return plugin.to_dict()
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== 数据源管理API ====================
+
+@router.get("/data-sources")
+async def list_data_sources(
+    source_type: Optional[str] = None,
+    market: Optional[str] = None,
+    status: Optional[str] = None,
+    enabled: Optional[bool] = None,
+    tags: Optional[List[str]] = None,
+):
+    """列出所有数据源"""
+    registry = get_ds_registry()
+    
+    type_enum = None
+    if source_type:
+        type_enum = DataSourceType(source_type)
+    
+    status_enum = None
+    if status:
+        status_enum = DataSourceStatus(status)
+    
+    sources = registry.list(
+        source_type=type_enum,
+        market=market,
+        status=status_enum,
+        enabled=enabled,
+        tags=tags,
+    )
+    
+    return {
+        "sources": [source.to_dict() for source in sources],
+        "count": len(sources),
+    }
+
+
+@router.get("/data-sources/{source_id}")
+async def get_data_source(source_id: str):
+    """获取数据源详情"""
+    registry = get_ds_registry()
+    source = registry.get(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Data source not found")
+    return source.to_dict()
+
+
+@router.post("/data-sources/{source_id}/check")
+async def check_data_source_availability(source_id: str):
+    """检查数据源可用性"""
+    manager = get_ds_manager()
+    is_available = await manager.check_availability(source_id)
+    return {
+        "source_id": source_id,
+        "available": is_available,
+    }
+
+
+@router.post("/data-sources/check-all")
+async def check_all_data_sources_availability():
+    """检查所有数据源可用性"""
+    manager = get_ds_manager()
+    await manager.check_all_availability()
+    return {"success": True, "message": "All data sources checked"}
+
+
+@router.post("/data-sources/stock-list")
+async def get_stock_list_from_sources(
+    market: Optional[str] = None,
+    preferred_sources: Optional[List[str]] = None,
+):
+    """从数据源获取股票列表"""
+    manager = get_ds_manager()
+    df, source_name = await manager.get_stock_list(market, preferred_sources)
+    
+    if df is None:
+        raise HTTPException(status_code=404, detail="No data source available")
+    
+    return {
+        "data": df.to_dict(orient="records"),
+        "source": source_name,
+        "count": len(df),
+    }
+
+
+@router.post("/data-sources/daily-basic")
+async def get_daily_basic_from_sources(
+    trade_date: str,
+    market: Optional[str] = None,
+    preferred_sources: Optional[List[str]] = None,
+):
+    """从数据源获取每日基础数据"""
+    manager = get_ds_manager()
+    df, source_name = await manager.get_daily_basic(trade_date, market, preferred_sources)
+    
+    if df is None:
+        raise HTTPException(status_code=404, detail="No data available")
+    
+    return {
+        "data": df.to_dict(orient="records"),
+        "source": source_name,
+        "count": len(df),
+    }
+
+
+@router.post("/data-sources/realtime-quotes")
+async def get_realtime_quotes_from_sources(
+    market: Optional[str] = None,
+    preferred_sources: Optional[List[str]] = None,
+):
+    """从数据源获取实时行情"""
+    manager = get_ds_manager()
+    quotes, source_name = await manager.get_realtime_quotes(market, preferred_sources)
+    
+    if quotes is None:
+        raise HTTPException(status_code=404, detail="No data available")
+    
+    return {
+        "quotes": quotes,
+        "source": source_name,
+        "count": len(quotes),
+    }
+
+
+@router.post("/data-sources/kline")
+async def get_kline_from_sources(
+    code: str,
+    period: str = "day",
+    limit: int = 120,
+    adj: Optional[str] = None,
+    market: Optional[str] = None,
+    preferred_sources: Optional[List[str]] = None,
+):
+    """从数据源获取K线数据"""
+    manager = get_ds_manager()
+    kline, source_name = await manager.get_kline(
+        code, period, limit, adj, market, preferred_sources
+    )
+    
+    if kline is None:
+        raise HTTPException(status_code=404, detail="No data available")
+    
+    return {
+        "kline": kline,
+        "source": source_name,
+        "count": len(kline),
+    }
+
+
+@router.post("/data-sources/news")
+async def get_news_from_sources(
+    code: str,
+    days: int = 2,
+    limit: int = 50,
+    include_announcements: bool = True,
+    market: Optional[str] = None,
+    preferred_sources: Optional[List[str]] = None,
+):
+    """从数据源获取新闻数据"""
+    manager = get_ds_manager()
+    news, source_name = await manager.get_news(
+        code, days, limit, include_announcements, market, preferred_sources
+    )
+    
+    if news is None:
+        raise HTTPException(status_code=404, detail="No data available")
+    
+    return {
+        "news": news,
+        "source": source_name,
+        "count": len(news),
+    }
 
